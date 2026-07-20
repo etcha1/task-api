@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -12,7 +11,7 @@ import (
 func GetConnection() *pgx.Conn {
 	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		log.Printf("Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -20,7 +19,7 @@ func GetConnection() *pgx.Conn {
 	if pingErr != nil {
 		log.Fatal(pingErr)
 	}
-	fmt.Println("Connected to database!")
+	log.Println("Connected to database!")
 
 	return conn
 }

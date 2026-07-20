@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/etcha1/task-api/internal/model"
@@ -32,4 +33,27 @@ func (ur *UserRepository) CreateUser(ctx context.Context, user model.User) (bool
 	}
 
 	return result.Insert(), nil
+}
+
+func (ur *UserRepository) GetUser(ctx context.Context, userData model.User) (*model.User, error) {
+	singleRow, err := ur.db.Query(ctx, "SELECT id, email, password_hash, created_at FROM users WHERE email = $1", userData.Email)
+	if err != nil {
+		return nil, fmt.Errorf("getUser: %w", err)
+	}
+	defer singleRow.Close()
+
+	user, err := pgx.CollectOneRow(singleRow, pgx.RowToStructByName[model.User])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("getUser: %w", err)
+	}
+
+	checkPasswordHash := utils.CheckPasswordHash(userData.Password, user.Password)
+	if !checkPasswordHash {
+		return nil, fmt.Errorf("getUser: password does not match")
+	}
+
+	return &user, nil
 }

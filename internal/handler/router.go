@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/etcha1/task-api/internal/auth"
 	"github.com/etcha1/task-api/internal/model"
 	"github.com/etcha1/task-api/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/jwtauth/v5"
 )
 
 func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository) {
@@ -17,6 +19,16 @@ func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository) {
 	r.Group(func(r chi.Router) {
 		r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
 			registerHandler(w, r, userRepo)
+		})
+		r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+			loginHandler(w, r, userRepo)
+		})
+	})
+	r.Group(func(r chi.Router) {
+		r.Use(jwtauth.Verifier(auth.TokenAuth))
+		r.Use(jwtauth.Authenticator(auth.TokenAuth))
+		r.Get("/tasks", func(w http.ResponseWriter, r *http.Request) {
+			tasksHandler(w, r)
 		})
 	})
 }
@@ -46,4 +58,64 @@ func registerHandler(w http.ResponseWriter, r *http.Request, userRepo *repositor
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(isUserCreated)
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request, userRepo *repository.UserRepository) {
+	var userData model.User
+
+	err := json.NewDecoder(r.Body).Decode(&userData)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON payload"})
+		return
+	}
+
+	user, err := userRepo.GetUser(r.Context(), userData)
+	if err != nil {
+		log.Printf("Error retrieving user: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve user"})
+		return
+	}
+
+	if user == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "User not found"})
+		return
+	}
+
+	token, err := auth.NewToken(user.ID)
+	if err != nil {
+		log.Printf("Error generating token: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to issue token"})
+		return
+	}
+
+	response := map[string]interface{}{
+		"user":  user,
+		"token": token,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+func tasksHandler(w http.ResponseWriter, r *http.Request) {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	userID := claims["user_id"]
+
+	response := map[string]interface{}{
+		"message": "This is a protected route",
+		"user_id": userID,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/etcha1/task-api/internal/auth"
 	"github.com/etcha1/task-api/internal/database"
 	"github.com/etcha1/task-api/internal/handler"
 	"github.com/etcha1/task-api/internal/repository"
@@ -18,6 +19,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
+
+	// Initialize JWT auth
+	auth.Initialize()
 
 	// Get database connection
 	db := database.GetConnection()
