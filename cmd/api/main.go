@@ -28,10 +28,11 @@ func main() {
 	defer db.Close(context.Background())
 
 	userRepo := repository.NewUserRepository(db)
+	taskRepo := repository.NewTaskRepository(db)
 
 	// Initialize the router
 	r := chi.NewRouter()
-	handler.RegisterRoutes(r, userRepo)
+	handler.RegisterRoutes(r, userRepo, taskRepo)
 	log.Println("Server starting on :3000...")
 	http.ListenAndServe(":3000", r)
 }

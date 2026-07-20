@@ -13,7 +13,7 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 )
 
-func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository) {
+func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository, taskRepo *repository.TaskRepository) {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Group(func(r chi.Router) {
@@ -28,7 +28,7 @@ func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository) {
 		r.Use(jwtauth.Verifier(auth.TokenAuth))
 		r.Use(jwtauth.Authenticator(auth.TokenAuth))
 		r.Get("/tasks", func(w http.ResponseWriter, r *http.Request) {
-			tasksHandler(w, r)
+			tasksHandler(w, r, taskRepo)
 		})
 	})
 }
@@ -106,13 +106,21 @@ func loginHandler(w http.ResponseWriter, r *http.Request, userRepo *repository.U
 	json.NewEncoder(w).Encode(response)
 }
 
-func tasksHandler(w http.ResponseWriter, r *http.Request) {
+func tasksHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	userID := claims["user_id"]
 
+	tasks, err := taskRepo.GetTasks(r.Context(), int(userID.(float64)))
+	if err != nil {
+		log.Printf("Error retrieving tasks: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve tasks"})
+		return
+	}
+
 	response := map[string]interface{}{
-		"message": "This is a protected route",
-		"user_id": userID,
+		"tasks": tasks,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
