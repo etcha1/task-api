@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/etcha1/task-api/internal/auth"
 	"github.com/etcha1/task-api/internal/model"
@@ -29,6 +31,19 @@ func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository, taskRepo *r
 		r.Use(jwtauth.Authenticator(auth.TokenAuth))
 		r.Get("/tasks", func(w http.ResponseWriter, r *http.Request) {
 			tasksHandler(w, r, taskRepo)
+		})
+		r.Route("/{taskID}", func(r chi.Router) {
+			r.Use(singleTaskHandler(taskRepo)) // Middleware to load task by ID
+			r.Get("/", getTaskHandler)         // GET /task/123
+			r.Put("/", func(w http.ResponseWriter, r *http.Request) {
+				updateTaskHandler(w, r, taskRepo)
+			}) // PUT /task/123
+			r.Delete("/", func(w http.ResponseWriter, r *http.Request) {
+				deleteTaskHandler(w, r, taskRepo)
+			}) // DELETE /task/123
+			r.Patch("/complete", func(w http.ResponseWriter, r *http.Request) {
+				patchTaskHandler(w, r, taskRepo)
+			}) // PATCH /task/123/complete
 		})
 	})
 }
@@ -126,4 +141,100 @@ func tasksHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.T
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+func singleTaskHandler(taskRepo *repository.TaskRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			taskID := chi.URLParam(r, "taskID")
+			task, err := taskRepo.GetTaskByID(r.Context(), taskID)
+			if err != nil {
+				log.Printf("Error retrieving task: %v", err)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve task"})
+				return
+			}
+
+			if task == nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Task not found"})
+				return
+			}
+
+			// Store the task in the request context for the next handlers to use
+			ctx := context.WithValue(r.Context(), "task", task)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func getTaskHandler(w http.ResponseWriter, r *http.Request) {
+	task := r.Context().Value("task").(*model.Task)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(task)
+}
+
+func updateTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
+	task := r.Context().Value("task").(*model.Task)
+
+	var updatedTask model.Task
+	err := json.NewDecoder(r.Body).Decode(&updatedTask)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON payload"})
+		return
+	}
+
+	err = taskRepo.UpdateTask(r.Context(), &updatedTask)
+	if err != nil {
+		log.Printf("Error updating task: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update task"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(task)
+}
+
+func deleteTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
+	task := r.Context().Value("task").(*model.Task)
+
+	err := taskRepo.DeleteTask(r.Context(), task.ID)
+	if err != nil {
+		log.Printf("Error deleting task: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to delete task"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Task deleted successfully", "taskID": strconv.Itoa(task.ID)})
+}
+
+func patchTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
+	task := r.Context().Value("task").(*model.Task)
+	task.Completed = true // Mark the task as completed
+
+	err := taskRepo.UpdateTask(r.Context(), task)
+	if err != nil {
+		log.Printf("Error updating task: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update task"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(task)
 }
