@@ -8,17 +8,18 @@ import (
 	"strconv"
 
 	"github.com/etcha1/task-api/internal/auth"
+	"github.com/etcha1/task-api/internal/middleware"
 	"github.com/etcha1/task-api/internal/model"
 	"github.com/etcha1/task-api/internal/repository"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
 )
 
 func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository, taskRepo *repository.TaskRepository) {
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Group(func(r chi.Router) {
+	r.Use(chiMiddleware.Logger)
+	r.Use(chiMiddleware.Recoverer)
+	r.With(middleware.ValidateBody[model.User]()).Group(func(r chi.Router) {
 		r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
 			registerHandler(w, r, userRepo)
 		})
@@ -26,7 +27,7 @@ func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository, taskRepo *r
 			loginHandler(w, r, userRepo)
 		})
 	})
-	r.Group(func(r chi.Router) {
+	r.With(middleware.ValidateBody[model.Task]()).Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(auth.TokenAuth))
 		r.Use(jwtauth.Authenticator(auth.TokenAuth))
 		r.Get("/tasks", func(w http.ResponseWriter, r *http.Request) {
