@@ -1,3 +1,11 @@
+// @title Task API
+// @version 1.0
+// @description API for managing users and tasks.
+// @host localhost:3000
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 package handler
 
 import (
@@ -14,6 +22,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
+	httpSwagger "github.com/swaggo/http-swagger"
+
+	_ "github.com/etcha1/task-api/docs"
 )
 
 func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository, taskRepo *repository.TaskRepository) {
@@ -47,8 +58,22 @@ func RegisterRoutes(r *chi.Mux, userRepo *repository.UserRepository, taskRepo *r
 			}) // PATCH /task/123/complete
 		})
 	})
+	r.Get("/docs/*", httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:3000/docs/doc.json"), // Points to the generated json
+	))
 }
 
+// RegisterUser godoc
+// @Summary Register a new user
+// @Description Create a new user account and return the created user.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param user body model.User true "User registration payload"
+// @Success 201 {object} model.User
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /register [post]
 func registerHandler(w http.ResponseWriter, r *http.Request, userRepo *repository.UserRepository) {
 	// Handle the registration logic here
 	var userData model.User
@@ -76,6 +101,18 @@ func registerHandler(w http.ResponseWriter, r *http.Request, userRepo *repositor
 	json.NewEncoder(w).Encode(isUserCreated)
 }
 
+// LoginUser godoc
+// @Summary Log in an existing user
+// @Description Authenticate a user and return a JWT token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param user body model.User true "User login payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /login [post]
 func loginHandler(w http.ResponseWriter, r *http.Request, userRepo *repository.UserRepository) {
 	var userData model.User
 
@@ -122,6 +159,16 @@ func loginHandler(w http.ResponseWriter, r *http.Request, userRepo *repository.U
 	json.NewEncoder(w).Encode(response)
 }
 
+// ListTasks godoc
+// @Summary List tasks
+// @Description Retrieve all tasks for the authenticated user.
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]string
+// @Router /tasks [get]
 func tasksHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	userID := claims["user_id"]
@@ -171,6 +218,18 @@ func singleTaskHandler(taskRepo *repository.TaskRepository) func(http.Handler) h
 	}
 }
 
+// GetTask godoc
+// @Summary Get a task by ID
+// @Description Fetch a single task for the authenticated user.
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param taskID path string true "Task ID"
+// @Success 200 {object} model.Task
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /{taskID} [get]
 func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 	task := r.Context().Value("task").(*model.Task)
 
@@ -179,6 +238,20 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(task)
 }
 
+// UpdateTask godoc
+// @Summary Update a task
+// @Description Update an existing task for the authenticated user.
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param taskID path string true "Task ID"
+// @Param task body model.Task true "Task update payload"
+// @Success 200 {object} model.Task
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /{taskID} [put]
 func updateTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
 	task := r.Context().Value("task").(*model.Task)
 
@@ -205,6 +278,18 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *reposit
 	json.NewEncoder(w).Encode(task)
 }
 
+// DeleteTask godoc
+// @Summary Delete a task
+// @Description Delete an existing task for the authenticated user.
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param taskID path string true "Task ID"
+// @Success 200 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /{taskID} [delete]
 func deleteTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
 	task := r.Context().Value("task").(*model.Task)
 
@@ -222,6 +307,18 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *reposit
 	json.NewEncoder(w).Encode(map[string]string{"message": "Task deleted successfully", "taskID": strconv.Itoa(task.ID)})
 }
 
+// CompleteTask godoc
+// @Summary Mark a task as complete
+// @Description Mark an existing task as completed for the authenticated user.
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param taskID path string true "Task ID"
+// @Success 200 {object} model.Task
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /{taskID}/complete [patch]
 func patchTaskHandler(w http.ResponseWriter, r *http.Request, taskRepo *repository.TaskRepository) {
 	task := r.Context().Value("task").(*model.Task)
 	task.Completed = true // Mark the task as completed
