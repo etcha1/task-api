@@ -6,15 +6,22 @@ import (
 
 	"github.com/etcha1/task-api/internal/model"
 	"github.com/jackc/pgx/v5"
+	pgxconn "github.com/jackc/pgx/v5/pgconn"
 )
+
+type queryExecutor interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgxconn.CommandTag, error)
+}
 
 // TaskRepository handles database operations for Tasks.
 type TaskRepository struct {
-	db *pgx.Conn // The connection handle is stored here
+	db queryExecutor
 }
 
 // NewTaskRepository acts as a constructor to inject the DB connection.
-func NewTaskRepository(db *pgx.Conn) *TaskRepository {
+func NewTaskRepository(db queryExecutor) *TaskRepository {
 	return &TaskRepository{db: db}
 }
 

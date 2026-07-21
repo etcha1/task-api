@@ -12,11 +12,11 @@ import (
 
 // UserRepository handles database operations for Users.
 type UserRepository struct {
-	db *pgx.Conn // The connection handle is stored here
+	db queryExecutor
 }
 
 // NewUserRepository acts as a constructor to inject the DB connection.
-func NewUserRepository(db *pgx.Conn) *UserRepository {
+func NewUserRepository(db queryExecutor) *UserRepository {
 	return &UserRepository{db: db}
 }
 
