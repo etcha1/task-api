@@ -1,5 +1,18 @@
 # task-api
 
+Tech Stack
+
+**Language**: Go  
+**Database**: PostgreSQL  
+**HTTP**: net/http  
+**Router**: chi  
+**SQL**: pgx  
+**Authentication**: JWT  
+**Password hashing**: bcrypt  
+**Configuration**: environment variables  
+**Migration tool**: golang-migrate  
+**Testing**: Go's testing package  
+
 ## Run project
 docker compose up -d
 
